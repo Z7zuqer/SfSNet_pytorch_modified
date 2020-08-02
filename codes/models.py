@@ -232,7 +232,7 @@ class LightEstimator(nn.Module):
     def __init__(self):
         super(LightEstimator, self).__init__()
         self.conv1 = get_conv(384, 128, kernel_size=1, stride=1)
-        self.pool  = nn.AvgPool2d(64, stride=1,padding=0) 
+        self.pool  = nn.AvgPool2d(256, stride=1,padding=0) 
         self.fc    = nn.Linear(128, 27)
 
     def forward(self, x):
@@ -521,6 +521,8 @@ class SkipNet_Encoder(nn.Module):
         self.conv3 = get_skipnet_conv(128, 256, kernel_size=4, stride=2, padding=1)
         self.conv4 = get_skipnet_conv(256, 256, kernel_size=4, stride=2, padding=1)
         self.conv5 = get_skipnet_conv(256, 256, kernel_size=4, stride=2, padding=1)
+        self.conv6 = get_skipnet_conv(256, 256, kernel_size=4, stride=2, padding=1)
+        self.conv7 = get_skipnet_conv(256, 256, kernel_size=4, stride=2, padding=1)
         self.fc256 = nn.Linear(4096, 256)
     
     def get_face(self, sh, normal, albedo):
@@ -538,16 +540,20 @@ class SkipNet_Encoder(nn.Module):
         # print('3 ', out_3.shape)
         out_4 = self.conv4(out_3)
         # print('4 ', out_4.shape)
-        out = self.conv5(out_4)
+        out_5 = self.conv5(out_4)
         # print('5 ', out.shape)
+        out_6 = self.conv6(out_5)
+        out = self.conv7(out_6)
         out = out.view(out.shape[0], -1)
         # print(out.shape)
         out = self.fc256(out)
-        return out, out_1, out_2, out_3, out_4
+        return out, out_1, out_2, out_3, out_4, out_5, out_6
         
 class SkipNet_Decoder(nn.Module):
     def __init__(self):
         super(SkipNet_Decoder, self).__init__()
+        self.dconvp1 = get_skipnet_deconv(256, 256, kernel_size=4, stride=2, padding=1)
+        self.dconvp2 = get_skipnet_deconv(256, 256, kernel_size=4, stride=2, padding=1)
         self.dconv1 = get_skipnet_deconv(256, 256, kernel_size=4, stride=2, padding=1)
         self.dconv2 = get_skipnet_deconv(256, 256, kernel_size=4, stride=2, padding=1)
         self.dconv3 = get_skipnet_deconv(256, 128, kernel_size=4, stride=2, padding=1)
@@ -555,9 +561,14 @@ class SkipNet_Decoder(nn.Module):
         self.dconv5 = get_skipnet_deconv(64, 64, kernel_size=4, stride=2, padding=1)
         self.conv6  = nn.Conv2d(64, 3, kernel_size=1, stride=1)
     
-    def forward(self, x, out_1, out_2, out_3, out_4):
+    def forward(self, x, out_1, out_2, out_3, out_4, out_5, out_6):
         # print('-0 ', x.shape)
-        out = self.dconv1(x)
+        out = self.dconvp1(x)
+        out += out_6
+        out = self.dconvp2(out)
+        out += out_5
+
+        out = self.dconv1(out)
         # print('-1 ', out.shape, out_4.shape)
         out += out_4
         out = self.dconv2(out)
@@ -591,7 +602,7 @@ class SkipNet(nn.Module):
         return recon
    
     def forward(self, x):
-        out, skip_1, skip_2, skip_3, skip_4 = self.encoder(x)
+        out, skip_1, skip_2, skip_3, skip_4, skip_5, skip_6 = self.encoder(x)
         out_mlp = out.unsqueeze(2)
         out_mlp = out_mlp.unsqueeze(3)
         # print(out_mlp.shape, out.shape)
@@ -599,8 +610,8 @@ class SkipNet(nn.Module):
         out_albedo = self.albedo_mlp(out_mlp)
         # print(out_normal.shape)
         light = self.light_decoder(out)
-        normal = self.normal_decoder(out_normal, skip_1, skip_2, skip_3, skip_4)
-        albedo = self.albedo_decoder(out_albedo, skip_1, skip_2, skip_3, skip_4)
+        normal = self.normal_decoder(out_normal, skip_1, skip_2, skip_3, skip_4, skip_5, skip_6)
+        albedo = self.albedo_decoder(out_albedo, skip_1, skip_2, skip_3, skip_4, skip_5, skip_6)
 
         shading = get_shading(normal, light)
         recon = reconstruct_image(shading, albedo)

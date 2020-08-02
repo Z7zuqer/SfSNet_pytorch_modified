@@ -9,7 +9,7 @@ import pandas as pd
 
 from codes.utils import save_image, denorm
 import numpy as np
-IMAGE_SIZE = 128
+IMAGE_SIZE = 512
 
 def generate_sfsnet_data_csv(dir, save_location):
     albedo = set()

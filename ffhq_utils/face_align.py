@@ -112,13 +112,12 @@ def main(sta, end):
     count = 0
 
     map_id = {}
-    base_path = '/data/home/v-had/github/ffhq-dataset/FFHQ'
-    img_list = sorted(os.listdir('/data/home/v-had/github/ffhq-dataset/FFHQ'))
-    thread_list = img_list[sta:end]
-    for x in thread_list:
-        if len(x) is not 5:
-            continue
-        img_url = os.path.join(base_path, x, '!input.jpg')
+    base_path = '/data/home/v-had/data_local/full_files/hard_images' # '/data/home/v-had/github/3Dfacedeblurring/dataset/huawei/blurry' # '/data/home/v-had/github/ffhq-dataset/FFHQ'
+    save_path = os.path.join(base_path, 'warp')
+    img_list = sorted(os.listdir(base_path))
+    for x in img_list: # thread_list:
+    #     x = '69999'
+        img_url = os.path.join(base_path, x) #, '!input.jpg')
         pil_img = Image.open(img_url).convert('RGB')
 
         # pil_img = Image.open("/home/d/ziyuwan/dataset/CelebAMask-HQ/test_imgs/9922.jpg").convert("RGB")
@@ -127,7 +126,6 @@ def main(sta, end):
         # pil_img.save('pil_resize.png')
 
         image = np.array(pil_img)
-        image = image[100:-100][:][:]
         # print('skimage')
         # print(image)
 
@@ -138,7 +136,7 @@ def main(sta, end):
 
         # print(len(det[1]))
 
-        # show_detection(image,det[0][0],det[1][0])
+        #show_detection(image,det[0][0],det[1][0])
 
         if len(det[1]) == 0:
             print("Warning: There is no face in %s" % (x))
@@ -162,8 +160,8 @@ def main(sta, end):
 
         img_name = x
 
-        io.imsave(os.path.join('/data/home/v-had/github/SfSNet_pytorch_modified/data/ffhq_1_32', img_name + '.png'),
-                  img_as_ubyte(aligned_face))
+        io.imsave(os.path.join(save_path, img_name + '.png'),
+                img_as_ubyte(aligned_face))
 
         count += 1
 
@@ -171,56 +169,6 @@ def main(sta, end):
             print('%d have finished ...' % (count))
 
 if __name__=='__main__':
-    import threading
-    import time
-
-    exitFlag = 0
-
-
-    class myThread(threading.Thread):
-        def __init__(self, sta, end):
-            threading.Thread.__init__(self)
-            self.sta = sta
-            self.end = end
-
-        def run(self):
-            print("start thread：" + self.name)
-            main(self.sta, self.end)
-            print("end thread：" + self.name)
-
-    try:
-        thr1 = myThread(50000, 60000)
-        thr2 = myThread(60000, 70000)
-#        thr4 = myThread(30000, 40000)
-#        thr5 = myThread(40000, 50000)
-#        thr6 = myThread(50000, 60000)
-#        thr7 = myThread(60000, 70000)
-        thr1.start()
-        thr2.start()
-#        thr4.start()
-#        thr5.start()
-#        thr6.start()
-#        thr7.start()
-        thr1.join()
-        thr2.join()
-#        thr4.join()
-#        thr5.join()
-#        thr6.join()
-#        thr7.join()
-        # splits = 70000//8
-        # cur = 0
-        # thr_list = []
-        # while cur < 69999:
-         #    end = cur + splits if cur+splits < 70000 else 69999
-          #   thr = myThread(cur, end)
-          #   thr.start()
-          #   thr_list.append(thr)
-          #   print(f"start thread from {cur} to {end}")
-          #   cur = end
-        # for thr in thr_list:
-         #   thr.join()
-
-    except:
-        print("error")
+    main(0, 1)
 
 

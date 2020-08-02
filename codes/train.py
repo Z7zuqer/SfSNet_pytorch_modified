@@ -175,7 +175,7 @@ def train_synthetic(sfs_net_model, syn_data, celeba_data=None, read_first=None,
     
     # Load Synthetic dataset
     train_dataset, val_dataset = get_sfsnet_dataset(syn_dir=syn_data+'train/', read_from_csv=syn_train_csv, read_celeba_csv=celeba_train_csv, read_first=read_first, validation_split=2, training_syn = training_syn)
-    test_dataset, _ = get_sfsnet_dataset(syn_dir=syn_data+'test/', read_from_csv=syn_test_csv, read_celeba_csv=celeba_test_csv, read_first=100, validation_split=0, training_syn = training_syn)
+    test_dataset, _ = get_sfsnet_dataset(syn_dir=syn_data+'test/', read_from_csv=syn_test_csv, read_celeba_csv=celeba_test_csv, read_first=200, validation_split=0, training_syn = training_syn)
 
     syn_train_dl  = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     syn_val_dl    = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
@@ -198,6 +198,7 @@ def train_synthetic(sfs_net_model, syn_data, celeba_data=None, read_first=None,
     # Collect model parameters
     model_parameters = sfs_net_model.parameters()
     optimizer = torch.optim.Adam(model_parameters, lr=lr, weight_decay=wt_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, num_epochs)
     normal_loss = nn.MSELoss()
     albedo_loss = nn.MSELoss()
     sh_loss     = nn.MSELoss()
@@ -267,13 +268,16 @@ def train_synthetic(sfs_net_model, syn_data, celeba_data=None, read_first=None,
             aloss += current_albedo_loss.item()
             shloss += current_sh_loss.item()
             rloss += current_recon_loss.item()
+            if bix % 50 ==0:
+                print('Epoch: {} Step: {}/{} - Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}'.format(epoch, bix, len(syn_train_dl), tloss, \
+                                                                                                    nloss, aloss, shloss, rloss))
 
         print('Epoch: {} - Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}'.format(epoch, tloss, \
                                                                                                     nloss, aloss, shloss, rloss))
         log_prefix = 'Syn Data'
         if celeba_data is not None:
             log_prefix = 'Mix Data '
-
+        scheduler.step()
         if epoch % 1 == 0:
             print('Training set results: Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}'.format(tloss / syn_train_len, \
                     nloss / syn_train_len, aloss / syn_train_len, shloss / syn_train_len, rloss / syn_train_len))
@@ -368,6 +372,7 @@ def train(sfs_net_model, syn_data, celeba_data=None, read_first=None,
     # Collect model parameters
     model_parameters = sfs_net_model.parameters()
     optimizer = torch.optim.Adam(model_parameters, lr=lr, weight_decay=wt_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, num_epochs)
     normal_loss = nn.L1Loss()
     albedo_loss = nn.L1Loss()
     sh_loss     = nn.MSELoss()
@@ -398,6 +403,7 @@ def train(sfs_net_model, syn_data, celeba_data=None, read_first=None,
         aloss = 0 # Albedo loss
         shloss = 0 # SH loss
         rloss = 0 # Reconstruction loss
+        cur_iter = 0
 
         for bix, data in enumerate(syn_train_dl):
             albedo, normal, mask, sh, face = data
@@ -437,6 +443,12 @@ def train(sfs_net_model, syn_data, celeba_data=None, read_first=None,
             aloss += current_albedo_loss.item()
             shloss += current_sh_loss.item()
             rloss += current_recon_loss.item()
+            if cur_iter % 50 == 0:
+                print('Epoch: {} iter: {}/{} LR: {} - Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}'.format(epoch, cur_iter, syn_train_len, optimizer.param_groups[0]['lr'], tloss, \
+                                                                                                    nloss, aloss, shloss, rloss))
+            cur_iter += 1
+
+        scheduler.step()
 
         print('Epoch: {} - Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}'.format(epoch, tloss, \
                                                                                                     nloss, aloss, shloss, rloss))
@@ -537,6 +549,7 @@ def train_syn_celeba_both(sfs_net_model, syn_data, celeba_data,
     # Collect model parameters
     model_parameters = sfs_net_model.parameters()
     optimizer = torch.optim.Adam(model_parameters, lr=lr, weight_decay=wt_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, num_epochs)
     normal_loss = nn.L1Loss()
     albedo_loss = nn.L1Loss()
     sh_loss     = nn.MSELoss()
@@ -576,6 +589,7 @@ def train_syn_celeba_both(sfs_net_model, syn_data, celeba_data,
         syn_train_iter    = iter(syn_train_dl)
         celeba_train_iter = iter(celeba_train_dl)
         # Until we process both Synthetic and CelebA data
+        cur_iter = 0
         while True:
             # Get and train on Synthetic dataset
             data = next(syn_train_iter, None)
@@ -647,8 +661,14 @@ def train_syn_celeba_both(sfs_net_model, syn_data, celeba_data,
 
             if data is None and c_data is None:
                 break
+            cur_iter += 1
+            if cur_iter % 50 == 0:
+                print('Epoch: {} iter: {}/{} current_LR: {}  - Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}, CelebA loss'.format(epoch, cur_iter, max(syn_train_len, celeba_train_len), optimizer.param_groups[0]['lr'], tloss, \
+                    nloss, aloss, shloss, rloss, celeba_tloss))
+
+        scheduler.step()
             
-        print('Epoch: {} - Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}, CelebA loss'.format(epoch, tloss, \
+        print('Epoch: {} current_LR: {}  - Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}, CelebA loss'.format(epoch, optimizer.param_groups[0]['lr'], tloss, \
                     nloss, aloss, shloss, rloss, celeba_tloss))
         if epoch % 1 == 0:
             print('Training set results: Total Loss: {}, Normal Loss: {}, Albedo Loss: {}, SH Loss: {}, Recon Loss: {}, CelebA Loss: {}'.format(tloss / syn_train_len, \

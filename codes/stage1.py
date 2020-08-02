@@ -11,10 +11,13 @@ import wandb
 from codes.train import *
 from codes.models import *
 
+
 def main():
     ON_SERVER = False
 
     parser = argparse.ArgumentParser(description='SfSNet - Residual')
+    parser.add_argument('--local_rank', type=int, default=0,
+                        help='input batch size for training (default: 8)')
     parser.add_argument('--batch_size', type=int, default=8, metavar='N',
                         help='input batch size for training (default: 8)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
@@ -39,7 +42,7 @@ def main():
         parser.add_argument('--log_dir', type=str, default='./results/',
                         help='Log Path')
     else:  
-        parser.add_argument('--syn_data', type=str, default='../data/sfs-net/',
+        parser.add_argument('--syn_data', type=str, default='../data/full_syn/',
                         help='Synthetic Dataset path')
         parser.add_argument('--celeba_data', type=str, default='../data/ffhq_pipeline_test/',
                         help='FFHQ Dataset path')
@@ -81,8 +84,7 @@ def main():
     # Initialize models
     skipnet_model      = SkipNet()
     if use_cuda:
-        skipnet_model = skipnet_model.cuda()
-
+        skipnet_model = skipnet_model.cuda() # .to(args.local_rank)
     if model_dir is not None:
         skipnet_model.load_state_dict(torch.load(model_dir + 'skipnet_model.pkl'))
     else:
